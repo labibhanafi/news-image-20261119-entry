@@ -1,74 +1,80 @@
 #!/usr/bin/env python3
-"""news-image-20261119 entry runner.
+"""Runner for the news-image-20261119 entry.
 
-Copies the repo's entry.png (front page of Thursday 19 November 2026
-world news) to the make.fun output directory, verifying it is a valid
-1024x1024 PNG first. Deterministic, standard library only.
+Validates entry.png (PNG signature, IHDR dimensions 1024x1024, size at
+most 1 MiB) and copies it into the output directory. The output directory
+comes from the MAKEFUN_OUTPUT_DIR environment variable, defaulting to
+/output. Use --check-only to validate without copying.
+
+Standard library only.
 """
-
+import argparse
 import os
 import shutil
 import struct
 import sys
+from pathlib import Path
 
+EXPECTED_W = 1024
+EXPECTED_H = 1024
+MAX_BYTES = 1024 * 1024
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-EXPECTED_WIDTH = 1024
-EXPECTED_HEIGHT = 1024
-MAX_FILE_SIZE = 1024 * 1024  # 1 MiB
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(HERE, "entry.png")
 
 
-def check_source(path):
-    """Validate the source image: size, PNG signature, IHDR dimensions."""
-    size = os.path.getsize(path)
-    if size == 0:
-        raise ValueError(f"{path}: empty file")
-    if size > MAX_FILE_SIZE:
-        raise ValueError(
-            f"{path}: {size} bytes exceeds the {MAX_FILE_SIZE} byte limit"
+def validate(path):
+    """Return a list of problems with the image at path (empty = valid)."""
+    problems = []
+    if not path.is_file():
+        return [f"entry image not found: {path}"]
+    data = path.read_bytes()
+    if len(data) > MAX_BYTES:
+        problems.append(f"file too large: {len(data)} bytes > {MAX_BYTES}")
+    if not data.startswith(PNG_SIGNATURE):
+        problems.append("missing PNG signature")
+        return problems
+    # IHDR is the first chunk: length(4) + type(4) + width(4) + height(4)
+    if len(data) < 24 or data[12:16] != b"IHDR":
+        problems.append("missing IHDR chunk")
+        return problems
+    width, height = struct.unpack(">II", data[16:24])
+    if (width, height) != (EXPECTED_W, EXPECTED_H):
+        problems.append(
+            f"wrong dimensions: {width}x{height}, expected "
+            f"{EXPECTED_W}x{EXPECTED_H}"
         )
-    width, height = read_png_dimensions(path)
-    if (width, height) != (EXPECTED_WIDTH, EXPECTED_HEIGHT):
-        raise ValueError(
-            f"{path}: is {width}x{height}, expected "
-            f"{EXPECTED_WIDTH}x{EXPECTED_HEIGHT}"
-        )
-    return size, width, height
+    if b"IEND" not in data[-16:]:
+        problems.append("missing IEND chunk (file looks truncated)")
+    return problems
 
 
-def read_png_dimensions(path):
-    """Return (width, height) after checking the PNG signature and IHDR."""
-    with open(path, "rb") as fh:
-        header = fh.read(8)
-        if header != PNG_SIGNATURE:
-            raise ValueError(f"{path}: not a PNG file (bad signature)")
-        length_bytes = fh.read(4)
-        chunk_type = fh.read(4)
-        if chunk_type != b"IHDR":
-            raise ValueError(f"{path}: first chunk is not IHDR")
-        ihdr = fh.read(13)
-        if len(ihdr) != 13:
-            raise ValueError(f"{path}: truncated IHDR chunk")
-        width, height = struct.unpack(">II", ihdr[:8])
-        return width, height
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="validate entry.png and exit without copying it",
+    )
+    args = parser.parse_args(argv)
 
+    here = Path(__file__).resolve().parent
+    source = here / "entry.png"
+    problems = validate(source)
+    if problems:
+        for problem in problems:
+            print(f"ERROR: {problem}", file=sys.stderr)
+        return 1
+    print(f"entry.png OK: {EXPECTED_W}x{EXPECTED_H}, "
+          f"{source.stat().st_size} bytes")
+    if args.check_only:
+        return 0
 
-def main():
-    check_only = "--check-only" in sys.argv[1:]
-    size, width, height = check_source(SOURCE)
-    print(f"entry.png OK: {width}x{height}, {size} bytes")
-    if check_only:
-        return
-
-    output_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    os.makedirs(output_dir, exist_ok=True)
-    dest = os.path.join(output_dir, "entry.png")
-
-    shutil.copyfile(SOURCE, dest)
-    print(f"entry.png ({width}x{height}) copied to {dest}")
+    out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dest = out_dir / "entry.png"
+    shutil.copyfile(source, dest)
+    print(f"copied to {dest}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
