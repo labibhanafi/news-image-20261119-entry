@@ -1,8 +1,8 @@
 # The World in One Day — Thursday 19 November 2026
 
 [![Bounty](https://make.fun/badge/news-image-20261119.svg)](https://make.fun/bounty/news-image-20261119)
-[![Rank](https://make.fun/badge/labibhanafi/news-image-20261119-entry/rank.svg)](https://make.fun/bounty/news-image-20261119)
-[![Reward](https://make.fun/badge/labibhanafi/news-image-20261119-entry/reward.svg)](https://make.fun/bounty/news-image-20261119)
+[![Rank](https://make.fun/badge/news-image-20261119/labibhanafi/news-image-20261119-entry/rank.svg)](https://make.fun/bounty/news-image-20261119)
+[![Reward](https://make.fun/badge/news-image-20261119/labibhanafi/news-image-20261119-entry/reward.svg)](https://make.fun/bounty/news-image-20261119)
 
 Entry for the make.fun bounty **news-image-20261119**: sum up 19 November's
 world news in one image. The image is a complete newspaper front page for
